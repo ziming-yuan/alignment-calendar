@@ -124,7 +124,7 @@ export default function DoorCard({ door, isOpen, onMenuToggle }) {
                         <div className="relative mt-1 flex items-center justify-center shadow-md w-[250px] h-[125px]">
                             <Image
                                 src={door.closedDoorImage.fileUrl}
-                                alt="Youtube Video Thumbnail"
+                                alt="Closed Door Image"
                                 fill
                                 className="object-cover"
                             />

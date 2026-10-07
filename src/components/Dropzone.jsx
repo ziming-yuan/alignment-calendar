@@ -35,6 +35,7 @@ export default function Dropzone({
     };
 
     const removeFile = () => {
+        setValue(`${name}FileUpdated`, false);
         if (selectedFile.isDefault) {
             setSelectedFile(null);
             onFileChange(null);

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useContext } from "react";
 import FormContext from "../contextProviders/FormContext";
 import TipTap from "@/components/rte/TipTap";
@@ -19,6 +19,7 @@ const formatDate = (dateString) => {
 
 export default function EditContentForm({ door }) {
     const { formRef, setIsModalOpen, setIsLoading } = useContext(FormContext);
+    const [saveError, setSaveError] = useState("");
 
     const {
         register,
@@ -51,18 +52,29 @@ export default function EditContentForm({ door }) {
 
     const processData = async (data) => {
         setIsLoading(true);
+        setSaveError("");
         const imageData = new FormData();
         imageData.append("contentImage", data.contentImage); // file is not serializable unless wrapped inside FormData
         imageData.append("closedDoorImage", data.closedDoorImage);
         data["contentImage"] = "";
         data["closedDoorImage"] = "";
-        await updateDoorContent(data, imageData);
-        setIsLoading(false);
-        setIsModalOpen(false);
+        try {
+            await updateDoorContent(data, imageData);
+            setIsModalOpen(false);
+        } catch {
+            setSaveError("Could not save this door. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
         <form ref={formRef} onSubmit={handleSubmit(processData)}>
+            {saveError && (
+                <p role="alert" className="mb-4 text-sm text-red-600">
+                    {saveError}
+                </p>
+            )}
             {/* Door Name */}
             <div className="relative flex flex-col mb-4 gap-y-2">
                 <label className="text-base font-medium">Door Name</label>
