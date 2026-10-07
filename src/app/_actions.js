@@ -84,7 +84,7 @@ export async function updateDoorContent(formData, imageData) {
 
     await dbConnect();
 
-    await Door.findByIdAndUpdate(doorId, {
+    const updates = {
         name,
         date: zonedTimeToUtc(date, "America/New_York"),
         closedDoorText,
@@ -93,53 +93,52 @@ export async function updateDoorContent(formData, imageData) {
         closedDoorColor,
         closedDoorTextColor,
         autoOpenTime: zonedTimeToUtc(autoOpenTime, "America/New_York"),
-    });
+    };
 
     if (contentImgOgD) {
-        // delete the previous file from uploadthing
-        await utapi.deleteFiles(contentImgKey);
-        // delete the url in the database
-        await Door.findByIdAndUpdate(doorId, {
-            $set: {
-                "contentImage.fileUrl": "",
-                "contentImage.fileKey": "",
-            },
-        });
+        updates["contentImage.fileUrl"] = "";
+        updates["contentImage.fileKey"] = "";
     }
     if (doorImgOgD) {
-        // delete the previous file from uploadthing
-        await utapi.deleteFiles(closedImgKey);
-        // delete the url in the database
-        await Door.findByIdAndUpdate(doorId, {
-            $set: {
-                "closedDoorImage.fileUrl": "",
-                "closedDoorImage.fileKey": "",
-            },
-        });
+        updates["closedDoorImage.fileUrl"] = "";
+        updates["closedDoorImage.fileKey"] = "";
     }
     if (contentImgU) {
-        // upload the new file to uploadthing
-        const { data } = await utapi.uploadFiles(contentImage);
-        // update contentImage in the database
-        await Door.findByIdAndUpdate(doorId, {
-            $set: {
-                "contentImage.fileUrl": data.url,
-                "contentImage.fileKey": data.key,
-            },
-        });
+        const { data, error } = await utapi.uploadFiles(contentImage);
+        if (error || !data?.url || !data?.key) {
+            throw new Error("Could not upload the content image. Your changes have not been saved.");
+        }
+        updates["contentImage.fileUrl"] = data.url;
+        updates["contentImage.fileKey"] = data.key;
     }
     if (doorImgU) {
-        // upload the new file to uploadthing
-        const { data } = await utapi.uploadFiles(closedDoorImage);
-        // update contentImage in the database
-        await Door.findByIdAndUpdate(doorId, {
-            $set: {
-                "closedDoorImage.fileUrl": data.url,
-                "closedDoorImage.fileKey": data.key,
-            },
-        });
+        const { data, error } = await utapi.uploadFiles(closedDoorImage);
+        if (error || !data?.url || !data?.key) {
+            throw new Error("Could not upload the closed-door image. Your changes have not been saved.");
+        }
+        updates["closedDoorImage.fileUrl"] = data.url;
+        updates["closedDoorImage.fileKey"] = data.key;
+    }
+
+    // Save successful uploads together before removing the previous files.
+    const savedDoor = await Door.findByIdAndUpdate(doorId, { $set: updates });
+    if (!savedDoor) {
+        throw new Error("The door could not be found. Your changes have not been saved.");
     }
     revalidateTag("editPageDoors");
+
+    const obsoleteKeys = [
+        contentImgOgD && contentImgKey,
+        doorImgOgD && closedImgKey,
+    ].filter(Boolean);
+    if (obsoleteKeys.length) {
+        try {
+            await utapi.deleteFiles(obsoleteKeys);
+        } catch {
+            // A cleanup failure must not make a successful save appear to fail.
+            console.error("Door saved, but its previous image files could not be removed.");
+        }
+    }
 }
 
 export async function updateCalendarContent(formData, imageData) {
